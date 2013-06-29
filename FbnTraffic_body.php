@@ -155,7 +155,6 @@ class FbnTraffic extends SpecialPage {
 		$wgOut->addHTML("</tfoot></table>\n");
 		$wgOut->addHTML("<p><em>Wochenlimit zu " . sprintf("%01.2f", round($limitData, 2)) . "% erreicht.</em></p>");
 		$wgOut->addHTML("</div>\n\n");
-		flush();
 
 		/* IP addresses assigned to user */
 		$wgOut->addHTML("<div class=\"tab-pane\" id=\"freigeschaltet\">\n<h2>aktuell freigeschaltete IP-Adressen</h2>\n");
@@ -265,7 +264,6 @@ class FbnTraffic extends SpecialPage {
 		$wgOut->addHTML("</tr>\n");
 		$wgOut->addHTML("</tbody></table>\n");
 		$wgOut->addHTML("</div>\n");
-		flush();
 
 		$wgOut->addHTML("<div class=\"tab-pane\" id=\"detail\">\n<h2>Detailierte Auswertung</h2>\n");
 
@@ -452,7 +450,6 @@ class FbnTraffic extends SpecialPage {
 		}
 		$ipTrafficLastWeekData->free();
 		$wgOut->addHTML("</tbody></table>\n</div>\n");
-		flush();
 
 		/* IP traffic in last week per hour */
 		$ipTrafficLastWeekHoursDataVars = array('ip', 'input', 'output', '(input + output) as sum', 'UNIX_TIMESTAMP(time) as time');
