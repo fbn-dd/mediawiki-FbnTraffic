@@ -169,6 +169,7 @@
 ul.nav-tabs {
 	list-style: none;
 	height:26px;
+	margin: 1em 0;
 }
 
 .nav-tabs,
