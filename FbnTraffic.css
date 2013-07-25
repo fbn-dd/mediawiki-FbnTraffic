@@ -442,3 +442,9 @@ a.badge:hover {
 .label-success {
 	background-color: #468847;
 }
+
+.label-info {
+	background-color: #3A87AD;
+}
+
+table.traffic tfoot { font-weight: bold; }

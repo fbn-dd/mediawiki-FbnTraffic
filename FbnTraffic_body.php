@@ -74,14 +74,21 @@ class FbnTraffic extends SpecialPage {
 		$wgOut->addHTML("<p>Anzahl der aktuell aktiven VPN-Verbindungen: " . $trafficActiveVpn->count . "</p>\n");
 
 		/* VPN traffic per day */
-		$vpnTrafficDailyDataVars = array('UNIX_TIMESTAMP(AcctStartTime) as datum', 'sum(`acctinputoctets`) as out_traffic', 'sum(`acctoutputoctets`) as in_traffic');
-		$vpnTrafficDailyDataConds = array('Username="' . $user->Username . '"', 'UNIX_TIMESTAMP(AcctStartTime) + AcctSessionTime > UNIX_TIMESTAMP(DATE_SUB(now(), INTERVAL 7 DAY))');
-		$vpnTrafficDailyDataOptions = array('GROUP BY' => 'Day(AcctStartTime)', 'ORDER BY' => 'datum DESC');
+		$vpnTrafficDailyDataVars = array('UNIX_TIMESTAMP(`AcctStopTime`) AS datum, Day(`AcctStopTime`) AS tag', 'Hour(`AcctStopTime`) AS stunde', 'sum(`acctinputoctets`) as out_traffic', 'sum(`acctoutputoctets`) as in_traffic');
+		$vpnTrafficDailyDataConds = array(
+			'Username="' . $user->Username . '"',
+			'UNIX_TIMESTAMP(AcctStartTime) + AcctSessionTime > UNIX_TIMESTAMP(DATE_SUB(now(), INTERVAL 7 DAY))',
+			'AcctStopTime IS NOT NULL',
+			'AcctStartTime IS NOT NULL',
+			'AcctStopTime != 0'
+		);
+		$vpnTrafficDailyDataOptions = array('GROUP BY' => 'tag', 'ORDER BY' => 'tag DESC');
 		$vpnTrafficDailyData = $dbTrafficRadius->select($wgFbnTrafficDbRadius['tableAccounting'], $vpnTrafficDailyDataVars, $vpnTrafficDailyDataConds, __METHOD__, $vpnTrafficDailyDataOptions);
 		$vpnTrafficDaily = array();
 		foreach ($vpnTrafficDailyData as $vpnTrafficDay) {
-			$vpnTrafficDaily[$vpnTrafficDay->datum]['in_traffic'] = $vpnTrafficDay->in_traffic;
-			$vpnTrafficDaily[$vpnTrafficDay->datum]['out_traffic'] = $vpnTrafficDay->out_traffic;
+			$vpnTrafficDaily[$vpnTrafficDay->tag]['datum'] = $vpnTrafficDay->datum;
+			$vpnTrafficDaily[$vpnTrafficDay->tag]['in_traffic'] = $vpnTrafficDay->in_traffic;
+			$vpnTrafficDaily[$vpnTrafficDay->tag]['out_traffic'] = $vpnTrafficDay->out_traffic;
 		}
 
 		$wgOut->addHTML("<table class=\"traffic sortable table table-condensed table-bordered table-striped\">
@@ -90,15 +97,17 @@ class FbnTraffic extends SpecialPage {
 			<th>Download</th>
 			<th>Upload</th>
 			<th>Summe</th>
-			<th width=\"50%\"></th>
+			<th width=\"25%\">Tagesanteil
+			<span class=\"label label-info\" title=\"100% entsprechen " . sprintf("%01.0f", $user->TrafficPunkteMax / 7) . " MB/Tag, diese entsprechen " . sprintf("%01.0f", $user->TrafficPunkteMax) . " MB/Woche\">?</span></th>
+			<th width=\"25%\">Wochenanteil</th>
 			</tr></thead><tbody>");
-		foreach ($vpnTrafficDaily as $datum => $traffic) {
+		foreach ($vpnTrafficDaily as $tag => $traffic) {
 			/* change Byte/s to MegaBytes/s */
 			$traffic['in_traffic'] = sprintf("%8.2f", ($traffic['in_traffic'] / 1048576));
 			$traffic['out_traffic'] = sprintf("%8.2f", ($traffic['out_traffic'] / 1048576));
 			/* get percentage of the traffic */
 			if ($user->TrafficPunkteMax > 0) {
-				$limit = 100 * ($traffic['in_traffic'] + $traffic['out_traffic']) / $user->TrafficPunkteMax / 7;
+				$limit = 100 * ($traffic['in_traffic'] + $traffic['out_traffic']) / ($user->TrafficPunkteMax / 7);
 			} else {
 				$limit = 0;
 			}
@@ -112,8 +121,23 @@ class FbnTraffic extends SpecialPage {
 			}
 
 			$wgOut->addHTML("<tr>\n");
-			$wgOut->addHTML("<td sorttable_customkey=\"" . $datum . "\">" . strftime('%d.%m. %A', $datum) . "</td>\n");
-			$wgOut->addHTML("<td>" . $traffic['in_traffic'] . " MB</td><td>" . $traffic['out_traffic'] . " MB</td><td>" . ($traffic['in_traffic'] + $traffic['out_traffic']) . " MB</td>\n");
+			$wgOut->addHTML("<td sorttable_customkey=\"" . $traffic['datum'] . "\">" . strftime('%d.%m. %A', $traffic['datum']) . "</td>\n");
+			$wgOut->addHTML("<td class=\"number\">" . $traffic['in_traffic'] . " MB</td>");
+			$wgOut->addHTML("<td class=\"number\">" . $traffic['out_traffic'] . " MB</td>");
+			$wgOut->addHTML("<td class=\"number\">" . ($traffic['in_traffic'] + $traffic['out_traffic']) . " MB</td>\n");
+			$wgOut->addHTML('<td><div class="progress progress-striped" title="' . sprintf("%01.2f", round($limitData, 2)) . '%">' .
+					'<div class="bar bar-success" style="width: ' . round($limit < 60 ? $limit : 60) . '%;"></div>' .
+					($limit >= 60 ? '<div class="bar bar-warning" style="width: ' . round($limit < 90 ? $limit - 60 : 30) . '%;"></div>' : '') .
+					($limit >= 90 ? '<div class="bar bar-danger" style="width: ' . round($limit < 100 ? $limit - 90 : 10) . '%;"></div>' : '') .
+					"</div></td>\n");
+			$limit = $limit / 7;
+			$limitData = $limit;
+			if ($limit < 1) {
+				$limit = 1;
+			}
+			if ($limit > 100) {
+				$limit = 100;
+			}
 			$wgOut->addHTML('<td><div class="progress progress-striped" title="' . sprintf("%01.2f", round($limitData, 2)) . '%">' .
 					'<div class="bar bar-success" style="width: ' . round($limit < 60 ? $limit : 60) . '%;"></div>' .
 					($limit >= 60 ? '<div class="bar bar-warning" style="width: ' . round($limit < 90 ? $limit - 60 : 30) . '%;"></div>' : '') .
@@ -146,8 +170,11 @@ class FbnTraffic extends SpecialPage {
 		}
 
 		$wgOut->addHTML("</tbody><tfoot>");
-		$wgOut->addHTML("<tr><td>Summe</td><td>" . $in_traffic . " MB</td><td>" . $out_traffic . " MB</td><td>" . ($in_traffic + $out_traffic) . " MB</td>\n");
-		$wgOut->addHTML('<td><div class="progress progress-striped" title="' . sprintf("%01.2f", round($limitData, 2)) . '%">' .
+		$wgOut->addHTML("<tr><td>Summe</td>");
+		$wgOut->addHTML("<td class=\"number\">" . $in_traffic . " MB</td>");
+		$wgOut->addHTML("<td class=\"number\">" . $out_traffic . " MB</td>");
+		$wgOut->addHTML("<td class=\"number\">" . ($in_traffic + $out_traffic) . " MB</td>\n");
+		$wgOut->addHTML('<td colspan="2"><div class="progress progress-striped" title="' . sprintf("%01.2f", round($limitData, 2)) . '%">' .
 				'<div class="bar bar-success" style="width: ' . round($limit < 60 ? $limit : 60) . '%;"></div>' .
 				($limit >= 60 ? '<div class="bar bar-warning" style="width: ' . round($limit < 90 ? $limit - 60 : 30) . '%;"></div>' : '') .
 				($limit >= 90 ? '<div class="bar bar-danger" style="width: ' . round($limit < 100 ? $limit - 90 : 10) . '%;"></div>' : '') .
