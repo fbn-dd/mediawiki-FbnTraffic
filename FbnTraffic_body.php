@@ -174,7 +174,8 @@ class FbnTraffic extends SpecialPage {
 		$wgOut->addHTML("<td class=\"number\">" . $in_traffic . " MB</td>");
 		$wgOut->addHTML("<td class=\"number\">" . $out_traffic . " MB</td>");
 		$wgOut->addHTML("<td class=\"number\">" . ($in_traffic + $out_traffic) . " MB</td>\n");
-		$wgOut->addHTML('<td colspan="2"><div class="progress progress-striped" title="' . sprintf("%01.2f", round($limitData, 2)) . '%">' .
+		$wgOut->addHTML("<td></td>");
+		$wgOut->addHTML('<td><div class="progress progress-striped" title="' . sprintf("%01.2f", round($limitData, 2)) . '%">' .
 				'<div class="bar bar-success" style="width: ' . round($limit < 60 ? $limit : 60) . '%;"></div>' .
 				($limit >= 60 ? '<div class="bar bar-warning" style="width: ' . round($limit < 90 ? $limit - 60 : 30) . '%;"></div>' : '') .
 				($limit >= 90 ? '<div class="bar bar-danger" style="width: ' . round($limit < 100 ? $limit - 90 : 10) . '%;"></div>' : '') .
